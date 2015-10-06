@@ -197,6 +197,17 @@ public:
         ROS_INFO_STREAM("[ped_manager] Pruning the map.");
     }
 
+    std::vector<visualization_msgs::Marker> toMarker(const ford_msgs::PedTrajVec& pedTrajVec)
+    {
+        std::vector<visualization_msgs::Marker> marker_vec;
+        std::vector<ford_msgs::PedTraj>::const_iterator it;
+        for (it = pedTrajVec.ped_traj_vec.begin(); it != pedTrajVec.ped_traj_vec.end(); ++it){
+            std::vector<visualization_msgs::Marker> markers = toMarker(*it);
+            marker_vec.insert(marker_vec.end(),markers.begin(),markers.end());
+        }
+        return marker_vec;
+    }
+
     std::vector<visualization_msgs::Marker> toMarker(const ford_msgs::PedTraj& pedTraj)
     {
         // Convert PedTraj to a vector of Markers
@@ -261,7 +272,6 @@ public:
         }
         return color_map_[ped_id];
     }
-
 
 
 };
