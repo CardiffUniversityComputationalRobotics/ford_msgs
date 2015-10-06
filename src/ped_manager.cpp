@@ -1,7 +1,13 @@
-#include <ros/ros.h>
 #include <map>
 #include <vector>
 #include <stdlib.h>
+#include <cstdio>
+#include <ctime>
+
+#include <ros/ros.h>
+// #include <rosbag/bag.h>
+// #include <ros/package.h>
+
 #include <pcl_clustering/Clusters.h>
 #include <std_msgs/UInt32.h>
 #include <std_msgs/ColorRGBA.h>
@@ -177,6 +183,7 @@ public:
         }
         // Publish
         pub_ped_diff_.publish(ped_traj_vec_msg);
+
     }
 
     void cbPrune(const ros::TimerEvent& timerEvent)
@@ -320,6 +327,23 @@ public:
         }
         return color_map_[ped_id];
     }
+
+    std::string getTimeString(const ros::Time& ros_time)
+    {
+        // std::string time_str;
+        // Test for time
+        std::time_t rawtime;
+        std::tm* timeinfo;
+        char buffer [80];
+        // std::time(&rawtime);
+        rawtime = ros_time.sec;
+        timeinfo = std::localtime(&rawtime);
+        std::strftime(buffer,80,"%Y-%m-%d-%H-%M-%S",timeinfo);
+        return std::string(buffer);
+    }
+
+
+
 };
 
 int main(int argc, char* argv[])
