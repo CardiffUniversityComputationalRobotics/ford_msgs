@@ -1,0 +1,14 @@
+<launch>
+	<arg name="bag" default="test_data.bag"/>
+	
+	<node name="rviz" pkg="rviz" type="rviz" output="screen" args="-d $(find ford_msgs)/config/rviz.rviz"/>
+	<node name="ped_manager" pkg="ford_msgs" type="ped_manager_node" output="screen">
+		<remap from="~clusters" to="/cluster/output/clusters" />
+		<remap from="~ped_id" to="/pedestrian_cluster_id" />
+	</node>
+	<node name="ped_logger" pkg="ford_msgs" type="ped_logger.py" output="screen">
+		<remap from="~ped_diff" to="ped_manager/ped_diff"/>
+	</node>
+	<param name="use_sim_time" value="true"/>
+	<node pkg="rosbag" type="play" name="bag_player" args="--clock $(find ford_msgs)/bag/$(arg bag) --rate=0.2"/>
+</launch>
