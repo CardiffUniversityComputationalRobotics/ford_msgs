@@ -7,7 +7,7 @@ Panels:
         - /Global Options1
         - /Pedestrians1
       Splitter Ratio: 0.5
-    Tree Height: 747
+    Tree Height: 359
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -53,7 +53,8 @@ Visualization Manager:
       Marker Topic: /ped_manager/ped_markers
       Name: Pedestrians
       Namespaces:
-        {}
+        ped_manager/pos: true
+        ped_manager/traj: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -80,22 +81,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 243.098
+      Distance: 146.759
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 22.9005
-        Y: 82.2324
-        Z: -47.4974
+        X: 34.5784
+        Y: 91.4612
+        Z: -61.3345
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.885398
+      Pitch: 0.780398
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.175399
+      Yaw: 0.150399
     Saved: ~
 Window Geometry:
   Displays:
