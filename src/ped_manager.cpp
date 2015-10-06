@@ -51,11 +51,17 @@ public:
     void setPed(){isPed_ = true;}
 
     std::vector<ford_msgs::Pose2DStamped> getPoseVec(bool diff_only)
-    {
+    {   
+        std::cout << "[getPoseVec] Started. ped_id = " << ped_id_ << " traj_length = " << traj_.size() << std::endl;
+        std::cout << "[getPoseVec] traj_.end() - trajIter_ = " << traj_.end() - trajIter_ << std::endl;
+
         if (diff_only){
-            return std::vector<ford_msgs::Pose2DStamped>(trajIter_,traj_.end());         
+            std::vector<ford_msgs::Pose2DStamped> subvec(trajIter_,traj_.end());
+            std::cout << "[getPoseVec] Finished. diff_only" << std::endl;
+            return subvec;
         }
         else{
+            std::cout << "[getPoseVec] Finished. not_diff_only" << std::endl;
             return traj_;
         }
     }
@@ -96,7 +102,7 @@ public:
 
     ros::Time current_cluster_time_;
 
-    std::map<size_t, PedTrajData> ped_map_;
+    std::map<size_t, PedTrajData*> ped_map_;
     std::map<size_t, std_msgs::ColorRGBA> color_map_;
 
     double diff_pub_period_;
@@ -148,17 +154,22 @@ public:
     void cbClusters(const pcl_clustering::Clusters& clusters){
         // Manage the clusers
         current_cluster_time_ = clusters.header.stamp; //Use the cluster time to avoid time synce problem between machines
+        std::map<size_t, PedTrajData*>::iterator it;
         for (int i = 0; i < clusters.labels.size(); i++){
             // This will create new map entry it's not there already
-            ped_map_[clusters.labels[i]].addData(clusters.header,clusters.labels[i],clusters.mean_points[i]);
+            it = ped_map_.find(clusters.labels[i]);
+            if (it == ped_map_.end()){
+                ped_map_[clusters.labels[i]] = new PedTrajData();
+            }
+            ped_map_[clusters.labels[i]]->addData(clusters.header,clusters.labels[i],clusters.mean_points[i]);
         }
     }
 
     void cbPedId(const std_msgs::UInt32 ped_id)
     {
-        std::map<size_t, PedTrajData>::iterator it = ped_map_.find(ped_id.data);
+        std::map<size_t, PedTrajData*>::iterator it = ped_map_.find(ped_id.data);
         if (it != ped_map_.end()){
-            it->second.setPed();
+            it->second->setPed();
         }
         ROS_INFO_STREAM("[PedManager::cbPedId]:" << ped_id);
     }
@@ -167,23 +178,23 @@ public:
     {
         // Return a vector of PedTraj messages
         ford_msgs::PedTrajVec pedTrajVecMsg;
-        std::map<size_t, PedTrajData>::iterator it;
+        std::map<size_t, PedTrajData*>::iterator it;
         ros::Time current_time = ros::Time::now();
 
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
             if (ped_only){
-                if (not it->second.isPed_){
+                if (not it->second->isPed_){
                     continue; // Skip non-pedestrian 
                 }
             }
 
             if (diff_only){
-                if (it->second.hasDiff()){ // Only publish if has diff.
-                    pedTrajVecMsg.ped_traj_vec.push_back(it->second.toPedTraj(diff_only));
+                if (it->second->hasDiff()){ // Only publish if has diff.
+                    pedTrajVecMsg.ped_traj_vec.push_back(it->second->toPedTraj(diff_only));
                 }
             }
             else{ // Publish all
-                pedTrajVecMsg.ped_traj_vec.push_back(it->second.toPedTraj(diff_only));
+                pedTrajVecMsg.ped_traj_vec.push_back(it->second->toPedTraj(diff_only));
             }
         }
         return pedTrajVecMsg;
@@ -191,57 +202,60 @@ public:
 
     void cbPublishPedDiff(const ros::TimerEvent& timerEvent)
     {
-        ford_msgs::PedTrajVec ped_traj_vec_msg = getPedTrajVec(true,true);
-        // Update the Diff Pointer
-        std::map<size_t, PedTrajData>::iterator it;
-        for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
-            it->second.updateDiffPtr();
-        }
-        // Publish
-        pub_ped_diff_.publish(ped_traj_vec_msg);
-
+        // ford_msgs::PedTrajVec ped_traj_vec_msg = getPedTrajVec(true,true);
+        // // Update the Diff Pointer
+        // std::map<size_t, PedTrajData*>::iterator it;
+        // for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
+        //     it->second->updateDiffPtr();
+        // }
+        // // Publish
+        // pub_ped_diff_.publish(ped_traj_vec_msg);
+        // ROS_INFO_STREAM(ped_traj_vec_msg);
     }
 
     void cbPrune(const ros::TimerEvent& timerEvent)
     {
-        pruneInactive(ros::Duration(inactive_tol_),true);
+        // pruneInactive(ros::Duration(inactive_tol_),true);
     }
 
     void pruneInactive(const ros::Duration& inactive_tol, bool keep_ped)
     {
-        std::map<size_t, PedTrajData>::iterator it;
+        ROS_INFO_STREAM("[PedManager::pruneInactive] Pruning started.");
+        std::map<size_t, PedTrajData*>::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
             if (keep_ped){
-                if (it->second.isPed_){ // Don't prune pedestrian data
+                if (it->second->isPed_){ // Don't prune pedestrian data
                     ++it;
                     continue;
                 }
             }
-
-            if (current_cluster_time_ - it->second.lastUpdateTime_ > inactive_tol){
+            if (current_cluster_time_ - it->second->lastUpdateTime_ > inactive_tol){
+                delete it->second;
                 ped_map_.erase(it++);
             }
             else{
                 ++it;
             }
         }
-        ROS_INFO_STREAM("[ped_manager] Pruning the map.");
+        ROS_INFO_STREAM("[PedManager::pruneInactive] Pruning done.");
     }
 
     void cbDump(const ros::TimerEvent& timerEvent)
     {
-        ford_msgs::PedTrajVec pedTrajVec = popInactivePed(ros::Duration(inactive_tol_));
-        pub_ped_dump_.publish(pedTrajVec);
+        // ford_msgs::PedTrajVec pedTrajVec = popInactivePed(ros::Duration(inactive_tol_));
+        // pub_ped_dump_.publish(pedTrajVec);
     }
 
     ford_msgs::PedTrajVec popInactivePed(const ros::Duration& inactive_tol)
     {
+        ROS_INFO_STREAM("[PedManager::popInactivePed] Popping started.");
         ford_msgs::PedTrajVec pedTrajVec;
-        std::map<size_t, PedTrajData>::iterator it;
+        std::map<size_t, PedTrajData*>::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
-            if (it->second.isPed_){ //Only process if is pedestrian
-                if (current_cluster_time_ - it->second.lastUpdateTime_ > inactive_tol){
-                    pedTrajVec.ped_traj_vec.push_back(it->second.toPedTraj(false));
+            if (it->second->isPed_){ //Only process if is pedestrian
+                if (current_cluster_time_ - it->second->lastUpdateTime_ > inactive_tol){
+                    pedTrajVec.ped_traj_vec.push_back(it->second->toPedTraj(false));
+                    delete it->second;
                     ped_map_.erase(it++);
                 }
                 else{ //Skip if still active
@@ -252,6 +266,7 @@ public:
                 ++it;
             }
         }
+        ROS_INFO_STREAM("[PedManager::popInactivePed] Popping done.");
         return pedTrajVec;
     }
 
