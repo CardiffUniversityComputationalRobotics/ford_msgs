@@ -108,12 +108,8 @@ public:
     PedManager()
     {
         nh_p_ = ros::NodeHandle("~");
-        // TODO set and read parameters
-        diff_pub_period_ = 1.0;
-        prune_period_ = 10.0;
-        inactive_tol_ = 60.0;
-        vis_period_ = 0.03;
-        dump_period_ = 10.0;
+        setDefaultParameters();
+        getParameters();
 
         sub_clusters_ = nh_p_.subscribe("clusters",10,&PedManager::cbClusters,this);
         sub_ped_id_ = nh_p_.subscribe("ped_id",10,&PedManager::cbPedId,this);
@@ -128,6 +124,26 @@ public:
 
     }
     ~PedManager(){}
+
+    void setDefaultParameters()
+    {
+        if (!ros::param::has("~diff_pub_period")) { ros::param::set("~diff_pub_period",1.0);}
+        if (!ros::param::has("~prune_period")) { ros::param::set("~prune_period",10.0);}
+        if (!ros::param::has("~inactive_tol")) { ros::param::set("~inactive_tol",60.0);}
+        if (!ros::param::has("~vis_period")) { ros::param::set("~vis_period",0.03);}
+        if (!ros::param::has("~dump_period")) { ros::param::set("~dump_period",60.0);}
+    }
+
+    void getParameters()
+    {
+        ros::param::getCached("~diff_pub_period",diff_pub_period_);
+        ros::param::getCached("~prune_period",prune_period_);
+        ros::param::getCached("~inactive_tol",inactive_tol_);
+        ros::param::getCached("~vis_period",vis_period_);
+        ros::param::getCached("~dump_period",dump_period_);
+    }
+
+
 
     void cbClusters(const pcl_clustering::Clusters& clusters){
         // Manage the clusers
@@ -144,7 +160,7 @@ public:
         if (it != ped_map_.end()){
             it->second.setPed();
         }
-        // Do nothing if the ped_id is not in the map
+        ROS_INFO_STREAM("[PedManager::cbPedId]:" << ped_id);
     }
 
     ford_msgs::PedTrajVec getPedTrajVec(bool diff_only, bool ped_only)
