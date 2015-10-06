@@ -50,6 +50,7 @@ add_message_files(
   FILES
   Pose2DStamped.msg
   PedTraj.msg
+  PedTrajVec.msg
 )
 
 ## Generate services in the 'srv' folder
