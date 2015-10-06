@@ -14,7 +14,6 @@
 #include "ford_msgs/Pose2DStamped.h"
 
 
-
 class PedTrajData{
 public:
     bool isPed_;
@@ -82,10 +81,12 @@ public:
     ros::Subscriber sub_ped_id_;
     ros::Publisher pub_ped_diff_;
     ros::Publisher pub_markers_;
+    ros::Publisher pub_ped_dump_;
 
     ros::Timer timer_ped_diff_;
     ros::Timer timer_prune_;
     ros::Timer timer_vis_;
+    ros::Timer timer_dump_;
 
     ros::Time current_cluster_time_;
 
@@ -96,6 +97,7 @@ public:
     double prune_period_;
     double inactive_tol_;
     double vis_period_;
+    double dump_period_;
 
     PedManager()
     {
@@ -105,15 +107,19 @@ public:
         prune_period_ = 10.0;
         inactive_tol_ = 60.0;
         vis_period_ = 0.03;
+        dump_period_ = 10.0;
 
         sub_clusters_ = nh_p_.subscribe("clusters",10,&PedManager::cbClusters,this);
         sub_ped_id_ = nh_p_.subscribe("ped_id",10,&PedManager::cbPedId,this);
         pub_ped_diff_ = nh_p_.advertise<ford_msgs::PedTrajVec>("ped_diff",1,true); //true for latching
+        pub_ped_dump_ = nh_p_.advertise<ford_msgs::PedTrajVec>("ped_dump",1,true); //true for latching
         pub_markers_ = nh_p_.advertise<visualization_msgs::MarkerArray>("ped_markers",1,true); //true for latching
 
         timer_ped_diff_= nh_p_.createTimer(ros::Duration(diff_pub_period_),&PedManager::cbPublishPedDiff,this);
         timer_prune_= nh_p_.createTimer(ros::Duration(prune_period_),&PedManager::cbPrune,this);
+        timer_dump_ = nh_p_.createTimer(ros::Duration(dump_period_),&PedManager::cbDump,this);
         timer_vis_= nh_p_.createTimer(ros::Duration(vis_period_),&PedManager::cbVis,this);
+
     }
     ~PedManager(){}
 
@@ -197,6 +203,33 @@ public:
             }
         }
         ROS_INFO_STREAM("[ped_manager] Pruning the map.");
+    }
+
+    void cbDump(const ros::TimerEvent& timerEvent)
+    {
+        ford_msgs::PedTrajVec pedTrajVec = popInactivePed(ros::Duration(inactive_tol_));
+        pub_ped_dump_.publish(pedTrajVec);
+    }
+
+    ford_msgs::PedTrajVec popInactivePed(const ros::Duration& inactive_tol)
+    {
+        ford_msgs::PedTrajVec pedTrajVec;
+        std::map<size_t, PedTrajData>::iterator it;
+        for (it = ped_map_.begin(); it != ped_map_.end();){
+            if (it->second.isPed_){ //Only process if is pedestrian
+                if (current_cluster_time_ - it->second.lastUpdateTime_ > inactive_tol){
+                    pedTrajVec.ped_traj_vec.push_back(it->second.toPedTraj(false));
+                    ped_map_.erase(it++);
+                }
+                else{ //Skip if still active
+                    ++it;
+                }
+            }
+            else{ //Skip if not a pedestrian
+                ++it;
+            }
+        }
+        return pedTrajVec;
     }
 
     void cbVis(const ros::TimerEvent& timerEvent)
@@ -287,8 +320,6 @@ public:
         }
         return color_map_[ped_id];
     }
-
-
 };
 
 int main(int argc, char* argv[])
