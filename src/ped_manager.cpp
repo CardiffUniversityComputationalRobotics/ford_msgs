@@ -81,9 +81,11 @@ public:
     ros::Subscriber sub_clusters_;
     ros::Subscriber sub_ped_id_;
     ros::Publisher pub_ped_diff_;
+    ros::Publisher pub_markers_;
 
     ros::Timer timer_ped_diff_;
     ros::Timer timer_prune_;
+    ros::Timer timer_vis_;
 
     ros::Time current_cluster_time_;
 
@@ -107,9 +109,11 @@ public:
         sub_clusters_ = nh_p_.subscribe("clusters",10,&PedManager::cbClusters,this);
         sub_ped_id_ = nh_p_.subscribe("ped_id",10,&PedManager::cbPedId,this);
         pub_ped_diff_ = nh_p_.advertise<ford_msgs::PedTrajVec>("ped_diff",1,true); //true for latching
+        pub_markers_ = nh_p_.advertise<visualization_msgs::MarkerArray>("ped_markers",1,true); //true for latching
 
         timer_ped_diff_= nh_p_.createTimer(ros::Duration(diff_pub_period_),&PedManager::cbPublishPedDiff,this);
         timer_prune_= nh_p_.createTimer(ros::Duration(prune_period_),&PedManager::cbPrune,this);
+        timer_vis_= nh_p_.createTimer(ros::Duration(vis_period_),&PedManager::cbVis,this);
     }
     ~PedManager(){}
 
@@ -131,10 +135,10 @@ public:
         // Do nothing if the ped_id is not in the map
     }
 
-    std::vector<ford_msgs::PedTraj> getPedTrajVec(bool diff_only, bool ped_only)
+    ford_msgs::PedTrajVec getPedTrajVec(bool diff_only, bool ped_only)
     {
         // Return a vector of PedTraj messages
-        std::vector<ford_msgs::PedTraj> pedTrajVec;
+        ford_msgs::PedTrajVec pedTrajVecMsg;
         std::map<size_t, PedTrajData>::iterator it;
         ros::Time current_time = ros::Time::now();
 
@@ -147,21 +151,19 @@ public:
 
             if (diff_only){
                 if (it->second.hasDiff()){ // Only publish if has diff.
-                    pedTrajVec.push_back(it->second.toPedTraj(diff_only));
+                    pedTrajVecMsg.ped_traj_vec.push_back(it->second.toPedTraj(diff_only));
                 }
             }
             else{ // Publish all
-                pedTrajVec.push_back(it->second.toPedTraj(diff_only));
+                pedTrajVecMsg.ped_traj_vec.push_back(it->second.toPedTraj(diff_only));
             }
         }
-        return pedTrajVec;
+        return pedTrajVecMsg;
     }
 
     void cbPublishPedDiff(const ros::TimerEvent& timerEvent)
     {
-        ford_msgs::PedTrajVec ped_traj_vec_msg;
-        ped_traj_vec_msg.ped_traj_vec = getPedTrajVec(true,true);
-
+        ford_msgs::PedTrajVec ped_traj_vec_msg = getPedTrajVec(true,true);
         // Update the Diff Pointer
         std::map<size_t, PedTrajData>::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
@@ -197,18 +199,31 @@ public:
         ROS_INFO_STREAM("[ped_manager] Pruning the map.");
     }
 
-    std::vector<visualization_msgs::Marker> toMarker(const ford_msgs::PedTrajVec& pedTrajVec)
+    void cbVis(const ros::TimerEvent& timerEvent)
+    {
+        publishMarkers();
+    }
+
+    void publishMarkers()
+    {
+        // Publish whole trajectories of pedestrians
+        visualization_msgs::MarkerArray markerArray;
+        markerArray.markers = toMarkerVec(getPedTrajVec(false,true)); 
+        pub_markers_.publish(markerArray);
+    }
+
+    std::vector<visualization_msgs::Marker> toMarkerVec(const ford_msgs::PedTrajVec& pedTrajVec)
     {
         std::vector<visualization_msgs::Marker> marker_vec;
         std::vector<ford_msgs::PedTraj>::const_iterator it;
         for (it = pedTrajVec.ped_traj_vec.begin(); it != pedTrajVec.ped_traj_vec.end(); ++it){
-            std::vector<visualization_msgs::Marker> markers = toMarker(*it);
+            std::vector<visualization_msgs::Marker> markers = toMarkerVec(*it);
             marker_vec.insert(marker_vec.end(),markers.begin(),markers.end());
         }
         return marker_vec;
     }
 
-    std::vector<visualization_msgs::Marker> toMarker(const ford_msgs::PedTraj& pedTraj)
+    std::vector<visualization_msgs::Marker> toMarkerVec(const ford_msgs::PedTraj& pedTraj)
     {
         // Convert PedTraj to a vector of Markers
         std::vector<visualization_msgs::Marker> marker_vec;
