@@ -27,30 +27,26 @@ typedef std::vector<ford_msgs::Pose2DStamped> PoseVec;
 class PedTrajData{
 public:
     bool isPed_;
-    // ros::Time lastUpdateTime_;
     size_t ped_id_;
-    std::string frame_id_;
     PoseVec traj_;
     int trajIndex_;
 
-    PedTrajData(){
+    PedTrajData(const std_msgs::Header& header, size_t ped_id, const geometry_msgs::Point& point){
         isPed_ = false;
-        // lastUpdateTime_ = ros::Time::now();
         trajIndex_ = -1;
+        addData(header,ped_id_,point);
     }
-
     ~PedTrajData(){}
 
     void addData(const std_msgs::Header& header, size_t ped_id, const geometry_msgs::Point& point)
     {
         ped_id_ = ped_id;
-        frame_id_ = header.frame_id;
+        // frame_id_ = header.frame_id;
         ford_msgs::Pose2DStamped pose2DStamped;
         pose2DStamped.header.frame_id = header.frame_id;
         pose2DStamped.header.stamp = header.stamp;
         pose2DStamped.pose.x = point.x;
         pose2DStamped.pose.y = point.y;
-        // lastUpdateTime_ = header.stamp;
         traj_.push_back(pose2DStamped);
     }
     void setPed(){isPed_ = true;}
@@ -199,9 +195,11 @@ public:
         for (int i = 0; i < clusters.labels.size(); i++){
             it = ped_map_.find(clusters.labels[i]);
             if (it == ped_map_.end()){
-                ped_map_[clusters.labels[i]] = new PedTrajData();
+                ped_map_[clusters.labels[i]] = new PedTrajData(clusters.header,clusters.labels[i],clusters.mean_points[i]);
             }
-            ped_map_[clusters.labels[i]]->addData(clusters.header,clusters.labels[i],clusters.mean_points[i]);
+            else{
+                ped_map_[clusters.labels[i]]->addData(clusters.header,clusters.labels[i],clusters.mean_points[i]);
+            }
         }
     }
 
