@@ -20,12 +20,14 @@
 #include "ford_msgs/PedTrajVec.h"
 #include "ford_msgs/Pose2DStamped.h"
 
+// #include "pedestrian.hpp"
+
 typedef std::vector<ford_msgs::Pose2DStamped> PoseVec;
 
 class PedTrajData{
 public:
     bool isPed_;
-    ros::Time lastUpdateTime_;
+    // ros::Time lastUpdateTime_;
     size_t ped_id_;
     std::string frame_id_;
     PoseVec traj_;
@@ -33,7 +35,7 @@ public:
 
     PedTrajData(){
         isPed_ = false;
-        lastUpdateTime_ = ros::Time::now();
+        // lastUpdateTime_ = ros::Time::now();
         trajIndex_ = -1;
     }
 
@@ -48,7 +50,7 @@ public:
         pose2DStamped.header.stamp = header.stamp;
         pose2DStamped.pose.x = point.x;
         pose2DStamped.pose.y = point.y;
-        lastUpdateTime_ = header.stamp;
+        // lastUpdateTime_ = header.stamp;
         traj_.push_back(pose2DStamped);
     }
     void setPed(){isPed_ = true;}
@@ -291,7 +293,7 @@ public:
                     continue;
                 }
             }
-            if (current_cluster_time_ - it->second->lastUpdateTime_ > inactive_tol){
+            if (current_cluster_time_ - it->second->traj_.back().header.stamp > inactive_tol){
                 delete it->second;
                 pruned_id_vec.push_back(it->first);
                 ROS_INFO_STREAM("[PedManager::pruneInactive] Pruned id: " << it->first);
@@ -317,7 +319,7 @@ public:
         PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
             if (it->second->isPed_){ //Only process if is pedestrian
-                if (current_cluster_time_ - it->second->lastUpdateTime_ > inactive_tol){
+                if (current_cluster_time_ - it->second->traj_.back().header.stamp > inactive_tol){
                     ford_msgs::PedTraj pedTraj;
                     if (it->second->fillDiffPedTraj(false,pedTraj)){
                         pedTrajVec.ped_traj_vec.push_back(pedTraj);
