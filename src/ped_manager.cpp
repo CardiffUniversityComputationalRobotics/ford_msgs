@@ -26,13 +26,13 @@ typedef std::vector<ford_msgs::Pose2DStamped> PoseVec;
 
 class PedTrajData{
 public:
-    bool isPed_;
+    size_t pedCount_;
     ford_msgs::PedTraj pedTraj_;
     int trajIndex_;
 
     PedTrajData(const std_msgs::Header& header, size_t ped_id, const geometry_msgs::Point& point){
-        isPed_ = false;
         trajIndex_ = -1;
+        pedCount_ = 0;
         addData(header,ped_id,point);
     }
     ~PedTrajData(){}
@@ -47,7 +47,9 @@ public:
         pose2DStamped.pose.y = point.y;
         pedTraj_.traj.push_back(pose2DStamped);
     }
-    void setPed(){isPed_ = true;}
+    void addPedCount(){
+        pedCount_++;
+    }
 
     size_t getPedId()
     {
@@ -149,6 +151,7 @@ public:
     double dump_period_;
     double recent_period_;
     double recent_tol_;
+    int ped_count_tol_;
 
     PedManager()
     {
@@ -181,6 +184,7 @@ public:
         if (!ros::param::has("~dump_period")) { ros::param::set("~dump_period",60.0);}
         if (!ros::param::has("~recent_period")) { ros::param::set("~recent_period",0.2);}
         if (!ros::param::has("~recent_tol")) { ros::param::set("~recent_tol",10.0);}
+        if (!ros::param::has("~ped_count_tol")) { ros::param::set("~ped_count_tol",1);}
     }
 
     void getParameters()
@@ -192,6 +196,7 @@ public:
         ros::param::getCached("~dump_period",dump_period_);
         ros::param::getCached("~recent_period",recent_period_);
         ros::param::getCached("~recent_tol",recent_tol_);
+        ros::param::getCached("~ped_count_tol",ped_count_tol_);
     }
 
     void cbClusters(const pcl_clustering::Clusters& clusters){
@@ -213,7 +218,7 @@ public:
     {
         PedMap::iterator it = ped_map_.find(ped_id.data);
         if (it != ped_map_.end()){
-            it->second->setPed();
+            it->second->addPedCount();
         }
         // ROS_INFO_STREAM("[PedManager::cbPedId]:" << ped_id);
     }
@@ -227,7 +232,7 @@ public:
 
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
             if (ped_only){
-                if (not it->second->isPed_){
+                if (not isPed(*(it->second))){
                     continue; // Skip non-pedestrian 
                 }
             }
@@ -246,7 +251,7 @@ public:
         ford_msgs::PedTrajVec pedTrajVecMsg;
         PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
-            if (not it->second->isPed_){
+            if (not isPed(*(it->second))){
                 continue;
             }
 
@@ -292,7 +297,7 @@ public:
         PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
             if (keep_ped){
-                if (it->second->isPed_){ // Don't prune pedestrian data
+                if (isPed(*(it->second))){ // Don't prune pedestrian data
                     ++it;
                     continue;
                 }
@@ -322,7 +327,7 @@ public:
         ford_msgs::PedTrajVec pedTrajVec;
         PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
-            if (it->second->isPed_){ //Only process if is pedestrian
+            if (isPed(*(it->second))){ //Only process if is pedestrian
                 if (current_cluster_time_ - it->second->getLastTime() > inactive_tol){
                     ford_msgs::PedTraj pedTraj;
                     if (it->second->fillDiffPedTraj(false,pedTraj)){
@@ -354,6 +359,11 @@ public:
         visualization_msgs::MarkerArray markerArray;
         markerArray.markers = toMarkerVec(getPedTrajVec(false,true)); 
         pub_markers_.publish(markerArray);
+    }
+
+    bool isPed(const PedTrajData& pedTrajData){
+        // TODO: better temporial filter/classifier
+        return (pedTrajData.pedCount_ > ped_count_tol_);
     }
 
     std::vector<visualization_msgs::Marker> toMarkerVec(const ford_msgs::PedTrajVec& pedTrajVec)

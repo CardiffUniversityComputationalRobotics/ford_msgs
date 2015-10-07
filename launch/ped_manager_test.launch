@@ -13,6 +13,7 @@
 		<param name="~dump_period" value="10.0"/>
 		<param name="~recent_period" value="0.2"/>
 		<param name="~recent_tol" value="10.0"/>
+		<param name="~ped_count_tol" value="5"/>
 	</node>
 	<node name="ped_logger" pkg="ford_msgs" type="ped_logger.py" output="screen">
 		<remap from="~ped_diff" to="ped_manager/ped_diff"/>
