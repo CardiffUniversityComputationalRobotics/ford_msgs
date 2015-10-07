@@ -105,9 +105,9 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+ # INCLUDE_DIRS include
 #  LIBRARIES ford_msgs
- CATKIN_DEPENDS geometry_msgs roscpp rospy std_msgs
+ CATKIN_DEPENDS geometry_msgs roscpp rospy std_msgs visualization_msgs message_runtime
 #  DEPENDS system_lib
 )
 
@@ -133,7 +133,8 @@ include_directories(
 
 ## Declare a C++ executable
 add_executable(ped_manager_node src/ped_manager.cpp)
-add_dependencies(ped_manager_node ford_msgs_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+# add_dependencies(ped_manager_node ford_msgs_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
+add_dependencies(ped_manager_node ${catkin_EXPORTED_TARGETS})
 target_link_libraries(ped_manager_node ${catkin_LIBRARIES})
 
 ## Add cmake target dependencies of the executable
