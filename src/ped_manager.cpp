@@ -20,6 +20,7 @@
 #include "ford_msgs/PedTrajVec.h"
 #include "ford_msgs/Pose2DStamped.h"
 
+typedef std::vector<ford_msgs::Pose2DStamped> PoseVec;
 
 class PedTrajData{
 public:
@@ -27,7 +28,7 @@ public:
     ros::Time lastUpdateTime_;
     size_t ped_id_;
     std::string frame_id_;
-    std::vector<ford_msgs::Pose2DStamped> traj_;
+    PoseVec traj_;
     int trajIndex_;
 
     PedTrajData(){
@@ -52,32 +53,6 @@ public:
     }
     void setPed(){isPed_ = true;}
 
-    std::vector<ford_msgs::Pose2DStamped> getPoseVec(bool diff_only)
-    {   
-        // std::cout << "[getPoseVec] traj_.end() - trajIter_ = " << traj_.end() - trajIter_ << std::endl;
-        if (diff_only){
-            return std::vector<ford_msgs::Pose2DStamped>(traj_.begin() + (trajIndex_ + 1),traj_.end());
-        }
-        else{
-            return traj_;
-        }
-    }
-
-    std::vector<ford_msgs::Pose2DStamped> getRecentPoseVec(const ros::Time& current_time,const ros::Duration& duration)
-    {
-        std::vector<ford_msgs::Pose2DStamped> temp_vec;
-        std::vector<ford_msgs::Pose2DStamped>::reverse_iterator rit;
-        for(rit = traj_.rbegin(); rit != traj_.rend(); ++rit){
-            if(current_time - rit->header.stamp <= duration){
-                temp_vec.push_back(*rit);
-            }
-            else{
-                break;
-            }
-        }
-        std::reverse(temp_vec.begin(),temp_vec.end()); //There might be a better way
-        return temp_vec;
-    }
 
     void updateDiffIndex(){
         trajIndex_ = traj_.size() - 1;
@@ -87,17 +62,60 @@ public:
         return trajIndex_ < traj_.size() - 1;
     }
 
-    ford_msgs::PedTraj toPedTraj(bool diff_only){
-        ford_msgs::PedTraj pedTrajMsg;
-        pedTrajMsg.ped_id = ped_id_;
-        pedTrajMsg.header.frame_id = frame_id_;
-        pedTrajMsg.header.stamp = lastUpdateTime_;
-        pedTrajMsg.traj = getPoseVec(diff_only);
-        return pedTrajMsg;
+    bool fillDiffPedTraj(bool diff_only,ford_msgs::PedTraj& pedTraj)
+    {
+        PoseVec poseVec;
+        if (diff_only){
+            poseVec = getPoseVecFrom(getTrajIter(trajIndex_));
+        }
+        else{
+            poseVec = traj_; 
+        }
+
+        if (poseVec.size() > 0){
+            pedTraj.ped_id = ped_id_;
+            pedTraj.traj = poseVec;
+            return true;             
+        }
+        else{
+            return false;
+        }
+    }
+    bool fillRecentPedTraj(const ros::Time& current_time,const ros::Duration& duration,ford_msgs::PedTraj& pedTraj)
+    {
+        PoseVec poseVec = getPoseVecFrom(getTrajIter(current_time,duration));
+        if (poseVec.size() > 0){
+            pedTraj.ped_id = ped_id_;
+            pedTraj.traj = poseVec;
+            return true;             
+        }
+        else{
+            return false;
+        }
     }
 
+private:
+    PoseVec getPoseVecFrom(PoseVec::iterator trajIter)
+    {
+        return PoseVec(trajIter,traj_.end());
+    }
+    PoseVec::iterator getTrajIter(int trajIndex)
+    {   
+        return traj_.begin() + (trajIndex_ + 1);
+    }
+    PoseVec::iterator getTrajIter(const ros::Time& current_time,const ros::Duration& duration)
+    {   //Return the iterator that points to the first element that's recent enough
+        PoseVec::reverse_iterator rit;
+        for(rit = traj_.rbegin(); rit != traj_.rend(); ++rit){
+            if(current_time - rit->header.stamp > duration){
+                break;
+            }
+        }
+        return rit.base();
+    }
 };
 
+typedef std::map<size_t, PedTrajData*> PedMap;
 
 class PedManager{
 public:
@@ -117,7 +135,7 @@ public:
 
     ros::Time current_cluster_time_;
 
-    std::map<size_t, PedTrajData*> ped_map_;
+    PedMap ped_map_;
     std::map<size_t, std_msgs::ColorRGBA> color_map_;
 
     double diff_pub_period_;
@@ -168,12 +186,10 @@ public:
         ros::param::getCached("~dump_period",dump_period_);
     }
 
-
-
     void cbClusters(const pcl_clustering::Clusters& clusters){
         // Manage the clusers
         current_cluster_time_ = clusters.header.stamp; //Use the cluster time to avoid time synce problem between machines
-        std::map<size_t, PedTrajData*>::iterator it;
+        PedMap::iterator it;
         for (int i = 0; i < clusters.labels.size(); i++){
             it = ped_map_.find(clusters.labels[i]);
             if (it == ped_map_.end()){
@@ -185,7 +201,7 @@ public:
 
     void cbPedId(const std_msgs::UInt32 ped_id)
     {
-        std::map<size_t, PedTrajData*>::iterator it = ped_map_.find(ped_id.data);
+        PedMap::iterator it = ped_map_.find(ped_id.data);
         if (it != ped_map_.end()){
             it->second->setPed();
         }
@@ -196,7 +212,7 @@ public:
     {
         // Return a vector of PedTraj messages
         ford_msgs::PedTrajVec pedTrajVecMsg;
-        std::map<size_t, PedTrajData*>::iterator it;
+        PedMap::iterator it;
         // ros::Time current_time = ros::Time::now();
 
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
@@ -206,13 +222,10 @@ public:
                 }
             }
 
-            if (diff_only){
-                if (it->second->hasDiff()){ // Only publish if has diff.
-                    pedTrajVecMsg.ped_traj_vec.push_back(it->second->toPedTraj(diff_only));
-                }
-            }
-            else{ // Publish all
-                pedTrajVecMsg.ped_traj_vec.push_back(it->second->toPedTraj(diff_only));
+            ford_msgs::PedTraj pedTraj;
+            if (it->second->fillDiffPedTraj(diff_only,pedTraj)){
+                // Only pushback non-empty PedTraj
+                pedTrajVecMsg.ped_traj_vec.push_back(pedTraj);
             }
         }
         return pedTrajVecMsg;
@@ -225,7 +238,7 @@ public:
         // Publish
         pub_ped_diff_.publish(ped_traj_vec_msg);
         // Update the Diff Pointer
-        std::map<size_t, PedTrajData*>::iterator it;
+        PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
             it->second->updateDiffIndex();
         }
@@ -247,7 +260,7 @@ public:
         // ROS_INFO_STREAM("[PedManager::pruneInactive] Pruning started.");
         std::vector<size_t> pruned_id_vec;
 
-        std::map<size_t, PedTrajData*>::iterator it;
+        PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
             if (keep_ped){
                 if (it->second->isPed_){ // Don't prune pedestrian data
@@ -278,11 +291,14 @@ public:
     {
         // ROS_INFO_STREAM("[PedManager::popInactivePed] Popping started.");
         ford_msgs::PedTrajVec pedTrajVec;
-        std::map<size_t, PedTrajData*>::iterator it;
+        PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
             if (it->second->isPed_){ //Only process if is pedestrian
                 if (current_cluster_time_ - it->second->lastUpdateTime_ > inactive_tol){
-                    pedTrajVec.ped_traj_vec.push_back(it->second->toPedTraj(false));
+                    ford_msgs::PedTraj pedTraj;
+                    if (it->second->fillDiffPedTraj(false,pedTraj)){
+                        pedTrajVec.ped_traj_vec.push_back(pedTraj);
+                    }
                     ROS_INFO_STREAM("[PedManager::popInactivePed] Popped ped_id: " << it->first);
                     delete it->second;
                     ped_map_.erase(it++);
@@ -328,12 +344,14 @@ public:
         std::vector<visualization_msgs::Marker> marker_vec;
         size_t traj_length = pedTraj.traj.size();
 
-        // TODO get color according to id
+        if (traj_length == 0){ //Return empty vector
+            return marker_vec;
+        }
 
         // Current Position
         visualization_msgs::Marker pos_marker;
-        pos_marker.header.frame_id = pedTraj.header.frame_id;
-        pos_marker.header.stamp = pedTraj.header.stamp;
+        pos_marker.header.frame_id = pedTraj.traj.back().header.frame_id;
+        pos_marker.header.stamp = pedTraj.traj.back().header.stamp;
         pos_marker.ns = "ped_manager/pos";
         pos_marker.id = pedTraj.ped_id;
         pos_marker.lifetime = ros::Duration(vis_period_ + 0.2);
@@ -350,8 +368,8 @@ public:
 
         // Trajectory
         visualization_msgs::Marker traj_marker;
-        traj_marker.header.frame_id = pedTraj.header.frame_id;
-        traj_marker.header.stamp = pedTraj.header.stamp;
+        traj_marker.header.frame_id = pedTraj.traj.back().header.frame_id;
+        traj_marker.header.stamp = pedTraj.traj.back().header.stamp;
         traj_marker.ns = "ped_manager/traj";
         traj_marker.id = pedTraj.ped_id;
         traj_marker.lifetime = ros::Duration(vis_period_ + 0.2);
@@ -360,7 +378,7 @@ public:
         traj_marker.scale.x = 0.1;
         traj_marker.scale.y = 0.1;
         traj_marker.scale.z = 0.1;
-        std::vector<ford_msgs::Pose2DStamped>::const_iterator it;
+        PoseVec::const_iterator it;
         for (it = pedTraj.traj.begin(); it != pedTraj.traj.end(); ++it){
             geometry_msgs::Point p;
             p.x = it->pose.x;
