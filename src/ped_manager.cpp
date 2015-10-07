@@ -27,37 +27,43 @@ typedef std::vector<ford_msgs::Pose2DStamped> PoseVec;
 class PedTrajData{
 public:
     bool isPed_;
-    size_t ped_id_;
-    PoseVec traj_;
+    ford_msgs::PedTraj pedTraj_;
     int trajIndex_;
 
     PedTrajData(const std_msgs::Header& header, size_t ped_id, const geometry_msgs::Point& point){
         isPed_ = false;
         trajIndex_ = -1;
-        addData(header,ped_id_,point);
+        addData(header,ped_id,point);
     }
     ~PedTrajData(){}
 
     void addData(const std_msgs::Header& header, size_t ped_id, const geometry_msgs::Point& point)
     {
-        ped_id_ = ped_id;
-        // frame_id_ = header.frame_id;
+        pedTraj_.ped_id = ped_id;
         ford_msgs::Pose2DStamped pose2DStamped;
         pose2DStamped.header.frame_id = header.frame_id;
         pose2DStamped.header.stamp = header.stamp;
         pose2DStamped.pose.x = point.x;
         pose2DStamped.pose.y = point.y;
-        traj_.push_back(pose2DStamped);
+        pedTraj_.traj.push_back(pose2DStamped);
     }
     void setPed(){isPed_ = true;}
 
+    size_t getPedId()
+    {
+        return pedTraj_.ped_id;
+    }
+    ros::Time getLastTime()
+    {
+        return pedTraj_.traj.back().header.stamp;
+    }
 
     void updateDiffIndex(){
-        trajIndex_ = traj_.size() - 1;
+        trajIndex_ = pedTraj_.traj.size() - 1;
     }
 
     bool hasDiff() const {
-        return trajIndex_ < traj_.size() - 1;
+        return trajIndex_ < pedTraj_.traj.size() - 1;
     }
 
     bool fillDiffPedTraj(bool diff_only,ford_msgs::PedTraj& pedTraj)
@@ -67,11 +73,11 @@ public:
             poseVec = getPoseVecFrom(getTrajIter(trajIndex_));
         }
         else{
-            poseVec = traj_; 
+            poseVec = pedTraj_.traj; 
         }
 
         if (poseVec.size() > 0){
-            pedTraj.ped_id = ped_id_;
+            pedTraj.ped_id = getPedId();
             pedTraj.traj = poseVec;
             return true;             
         }
@@ -83,7 +89,7 @@ public:
     {
         PoseVec poseVec = getPoseVecFrom(getTrajIter(current_time,duration));
         if (poseVec.size() > 0){
-            pedTraj.ped_id = ped_id_;
+            pedTraj.ped_id = getPedId();
             pedTraj.traj = poseVec;
             return true;             
         }
@@ -95,16 +101,16 @@ public:
 private:
     PoseVec getPoseVecFrom(PoseVec::iterator trajIter)
     {
-        return PoseVec(trajIter,traj_.end());
+        return PoseVec(trajIter,pedTraj_.traj.end());
     }
     PoseVec::iterator getTrajIter(int trajIndex)
     {   
-        return traj_.begin() + (trajIndex_ + 1);
+        return pedTraj_.traj.begin() + (trajIndex_ + 1);
     }
     PoseVec::iterator getTrajIter(const ros::Time& current_time,const ros::Duration& duration)
     {   //Return the iterator that points to the first element that's recent enough
         PoseVec::reverse_iterator rit;
-        for(rit = traj_.rbegin(); rit != traj_.rend(); ++rit){
+        for(rit = pedTraj_.traj.rbegin(); rit != pedTraj_.traj.rend(); ++rit){
             if(current_time - rit->header.stamp > duration){
                 break;
             }
@@ -291,7 +297,7 @@ public:
                     continue;
                 }
             }
-            if (current_cluster_time_ - it->second->traj_.back().header.stamp > inactive_tol){
+            if (current_cluster_time_ - it->second->getLastTime() > inactive_tol){
                 delete it->second;
                 pruned_id_vec.push_back(it->first);
                 ROS_INFO_STREAM("[PedManager::pruneInactive] Pruned id: " << it->first);
@@ -317,7 +323,7 @@ public:
         PedMap::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
             if (it->second->isPed_){ //Only process if is pedestrian
-                if (current_cluster_time_ - it->second->traj_.back().header.stamp > inactive_tol){
+                if (current_cluster_time_ - it->second->getLastTime() > inactive_tol){
                     ford_msgs::PedTraj pedTraj;
                     if (it->second->fillDiffPedTraj(false,pedTraj)){
                         pedTrajVec.ped_traj_vec.push_back(pedTraj);
