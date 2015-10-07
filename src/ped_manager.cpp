@@ -26,12 +26,13 @@ public:
     ros::Time lastUpdateTime_;
     size_t ped_id_;
     std::string frame_id_;
+    std::vector<ford_msgs::Pose2DStamped> traj_;
+    int trajIndex_;
 
     PedTrajData(){
         isPed_ = false;
         lastUpdateTime_ = ros::Time::now();
-        trajIter_ = traj_.begin();
-        // std::cout << "[PedTrajData] " << trajIter_ - traj_.end() << std::endl;
+        trajIndex_ = -1;
     }
 
     ~PedTrajData(){}
@@ -47,9 +48,9 @@ public:
         pose2DStamped.pose.y = point.y;
         lastUpdateTime_ = header.stamp;
         // std::cout << "[addData]: Before ped_id_: " << ped_id_  << " traj_.end() - trajIter_ " << trajIter_ - traj_.end() << std::endl;
-        std::cout << "[addData]: Before ped_id: " << ped_id_ << " traj_.size(): " << traj_.size() << " iter diff: " << trajIter_ - traj_.begin() << std::endl;
+        // std::cout << "[addData]: Before ped_id: " << ped_id_ << " traj_.size(): " << traj_.size() << " iter diff: " << trajIter_ - traj_.begin() << std::endl;
         traj_.push_back(pose2DStamped);
-        std::cout << "[addData]: After  ped_id: " << ped_id_ << " traj_.size(): " << traj_.size() << " iter diff: " << trajIter_ - traj_.begin() << std::endl;
+        // std::cout << "[addData]: After  ped_id: " << ped_id_ << " traj_.size(): " << traj_.size() << " iter diff: " << trajIter_ - traj_.begin() << std::endl;
     }
     void setPed(){isPed_ = true;}
 
@@ -57,29 +58,19 @@ public:
     {   
         // std::cout << "[getPoseVec] traj_.end() - trajIter_ = " << traj_.end() - trajIter_ << std::endl;
         if (diff_only){
-            std::cout << "[getPoseVec] diff_only Started. ped_id = " << ped_id_ << " traj_length = " << traj_.size() << std::endl;
-            std::cout << "[getPoseVec] Total Diff: " << traj_.end() - traj_.begin() << " mid to begin: " <<  trajIter_ - traj_.begin() << std::endl;
-            std::vector<ford_msgs::Pose2DStamped> temp_vec;
-            std::vector<ford_msgs::Pose2DStamped>::iterator iter;
-            for (iter = trajIter_; iter != traj_.end(); iter++){
-                temp_vec.push_back(*iter);
-            }
-            std::cout << "[getPoseVec] diff_only Finished. diff_only" << std::endl;
-            return temp_vec;
+            return std::vector<ford_msgs::Pose2DStamped>(traj_.begin() + (trajIndex_ + 1),traj_.end());
         }
         else{
-            // std::cout << "[getPoseVec] Finished. not_diff_only" << std::endl;
             return traj_;
         }
     }
 
-    void updateDiffPtr(){
-        // trajIter_ = traj_.end();
+    void updateDiffIndex(){
+        trajIndex_ = traj_.size() - 1;
     }
 
     bool hasDiff() const {
-        // return trajIter_ != traj_.end();
-        return true;
+        return trajIndex_ < traj_.size() - 1;
     }
 
     ford_msgs::PedTraj toPedTraj(bool diff_only){
@@ -91,9 +82,6 @@ public:
         return pedTrajMsg;
     }
 
-private:
-    std::vector<ford_msgs::Pose2DStamped> traj_;
-    std::vector<ford_msgs::Pose2DStamped>::iterator trajIter_;
 };
 
 
@@ -214,15 +202,14 @@ public:
     {
         ford_msgs::PedTrajVec ped_traj_vec_msg = getPedTrajVec(true,true);
 
-        // Update the Diff Pointer
-        // std::map<size_t, PedTrajData*>::iterator it;
-        // for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
-        //     it->second->updateDiffPtr();
-        // }
-
         // Publish
         pub_ped_diff_.publish(ped_traj_vec_msg);
-        // ROS_INFO_STREAM(ped_traj_vec_msg);
+        // Update the Diff Pointer
+        std::map<size_t, PedTrajData*>::iterator it;
+        for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
+            it->second->updateDiffIndex();
+        }
+        ROS_INFO_STREAM(ped_traj_vec_msg);
     }
 
     void cbPrune(const ros::TimerEvent& timerEvent)
