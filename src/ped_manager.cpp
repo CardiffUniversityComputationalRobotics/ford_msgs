@@ -163,7 +163,7 @@ public:
         timer_prune_= nh_p_.createTimer(ros::Duration(prune_period_),&PedManager::cbPrune,this);
         timer_dump_ = nh_p_.createTimer(ros::Duration(dump_period_),&PedManager::cbDump,this);
         timer_vis_= nh_p_.createTimer(ros::Duration(vis_period_),&PedManager::cbVis,this);
-        timer_recent_= nh_p_.createTimer(ros::Duration(vis_period_),&PedManager::cbRecent,this);
+        timer_recent_= nh_p_.createTimer(ros::Duration(recent_period_),&PedManager::cbRecent,this);
 
     }
     ~PedManager(){}
@@ -175,6 +175,8 @@ public:
         if (!ros::param::has("~inactive_tol")) { ros::param::set("~inactive_tol",60.0);}
         if (!ros::param::has("~vis_period")) { ros::param::set("~vis_period",0.03);}
         if (!ros::param::has("~dump_period")) { ros::param::set("~dump_period",60.0);}
+        if (!ros::param::has("~recent_period")) { ros::param::set("~recent_period",0.2);}
+        if (!ros::param::has("~recent_tol")) { ros::param::set("~recent_tol",10.0);}
     }
 
     void getParameters()
@@ -184,6 +186,8 @@ public:
         ros::param::getCached("~inactive_tol",inactive_tol_);
         ros::param::getCached("~vis_period",vis_period_);
         ros::param::getCached("~dump_period",dump_period_);
+        ros::param::getCached("~recent_period",recent_period_);
+        ros::param::getCached("~recent_tol",recent_tol_);
     }
 
     void cbClusters(const pcl_clustering::Clusters& clusters){
@@ -231,6 +235,24 @@ public:
         return pedTrajVecMsg;
     }
 
+    ford_msgs::PedTrajVec getRecentPedTrajVec(const ros::Duration& duration)
+    {
+        ford_msgs::PedTrajVec pedTrajVecMsg;
+        PedMap::iterator it;
+        for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
+            if (not it->second->isPed_){
+                continue;
+            }
+
+            ford_msgs::PedTraj pedTraj;
+            if (it->second->fillRecentPedTraj(current_cluster_time_,duration,pedTraj)){
+                // Only pushback non-empty PedTraj
+                pedTrajVecMsg.ped_traj_vec.push_back(pedTraj);
+            }
+        }
+        return pedTrajVecMsg;
+    }
+
     void cbPublishPedDiff(const ros::TimerEvent& timerEvent)
     {
         ford_msgs::PedTrajVec ped_traj_vec_msg = getPedTrajVec(true,true);
@@ -248,6 +270,7 @@ public:
     void cbRecent(const ros::TimerEvent& timerEvent)
     {
         // TODO publish recent trajectory
+        pub_ped_recent_.publish(getRecentPedTrajVec(ros::Duration(recent_tol_)));
     }
 
     void cbPrune(const ros::TimerEvent& timerEvent)
