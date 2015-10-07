@@ -207,6 +207,7 @@ public:
             it = ped_map_.find(clusters.labels[i]);
             if (it == ped_map_.end()){
                 ped_map_[clusters.labels[i]] = new PedTrajData(clusters.header,clusters.labels[i],clusters.mean_points[i]);
+                ROS_INFO_STREAM("[PedManager::cbClusters] Add " << clusters.labels[i] << " to ped_map_");
             }
             else{
                 ped_map_[clusters.labels[i]]->addData(clusters.header,clusters.labels[i],clusters.mean_points[i]);
@@ -303,16 +304,21 @@ public:
                 }
             }
             if (current_cluster_time_ - it->second->getLastTime() > inactive_tol){
-                delete it->second;
-                pruned_id_vec.push_back(it->first);
-                ROS_INFO_STREAM("[PedManager::pruneInactive] Pruned id: " << it->first);
-                ped_map_.erase(it++);
+                removePed(it++);
             }
             else{
                 ++it;
             }
         }
 
+    }
+
+    void removePed(PedMap::iterator it)
+    {
+        color_map_.erase(it->first);
+        delete it->second;
+        ped_map_.erase(it);
+        ROS_INFO_STREAM("[PedManager::removePed] Remove "<< it->first );
     }
 
     void cbDump(const ros::TimerEvent& timerEvent)
@@ -333,9 +339,7 @@ public:
                     if (it->second->fillDiffPedTraj(false,pedTraj)){
                         pedTrajVec.ped_traj_vec.push_back(pedTraj);
                     }
-                    ROS_INFO_STREAM("[PedManager::popInactivePed] Popped ped_id: " << it->first);
-                    delete it->second;
-                    ped_map_.erase(it++);
+                    removePed(it++);
                 }
                 else{ //Skip if still active
                     ++it;
