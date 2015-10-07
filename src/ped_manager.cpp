@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <cstdio>
 #include <ctime>
+#include <algorithm>
 
 #include <ros/ros.h>
 // #include <rosbag/bag.h>
@@ -47,10 +48,7 @@ public:
         pose2DStamped.pose.x = point.x;
         pose2DStamped.pose.y = point.y;
         lastUpdateTime_ = header.stamp;
-        // std::cout << "[addData]: Before ped_id_: " << ped_id_  << " traj_.end() - trajIter_ " << trajIter_ - traj_.end() << std::endl;
-        // std::cout << "[addData]: Before ped_id: " << ped_id_ << " traj_.size(): " << traj_.size() << " iter diff: " << trajIter_ - traj_.begin() << std::endl;
         traj_.push_back(pose2DStamped);
-        // std::cout << "[addData]: After  ped_id: " << ped_id_ << " traj_.size(): " << traj_.size() << " iter diff: " << trajIter_ - traj_.begin() << std::endl;
     }
     void setPed(){isPed_ = true;}
 
@@ -63,6 +61,22 @@ public:
         else{
             return traj_;
         }
+    }
+
+    std::vector<ford_msgs::Pose2DStamped> getRecentPoseVec(const ros::Time& current_time,const ros::Duration& duration)
+    {
+        std::vector<ford_msgs::Pose2DStamped> temp_vec;
+        std::vector<ford_msgs::Pose2DStamped>::reverse_iterator rit;
+        for(rit = traj_.rbegin(); rit != traj_.rend(); ++rit){
+            if(current_time - rit->header.stamp <= duration){
+                temp_vec.push_back(*rit);
+            }
+            else{
+                break;
+            }
+        }
+        std::reverse(temp_vec.begin(),temp_vec.end()); //There might be a better way
+        return temp_vec;
     }
 
     void updateDiffIndex(){
@@ -93,11 +107,13 @@ public:
     ros::Publisher pub_ped_diff_;
     ros::Publisher pub_markers_;
     ros::Publisher pub_ped_dump_;
+    ros::Publisher pub_ped_recent_;
 
     ros::Timer timer_ped_diff_;
     ros::Timer timer_prune_;
     ros::Timer timer_vis_;
     ros::Timer timer_dump_;
+    ros::Timer timer_recent_;
 
     ros::Time current_cluster_time_;
 
@@ -109,6 +125,8 @@ public:
     double inactive_tol_;
     double vis_period_;
     double dump_period_;
+    double recent_period_;
+    double recent_tol_;
 
     PedManager()
     {
@@ -120,12 +138,14 @@ public:
         sub_ped_id_ = nh_p_.subscribe("ped_id",10,&PedManager::cbPedId,this);
         pub_ped_diff_ = nh_p_.advertise<ford_msgs::PedTrajVec>("ped_diff",1,true); //true for latching
         pub_ped_dump_ = nh_p_.advertise<ford_msgs::PedTrajVec>("ped_dump",1,true); //true for latching
+        pub_ped_recent_ = nh_p_.advertise<ford_msgs::PedTrajVec>("ped_recent",1,true); //true for latching
         pub_markers_ = nh_p_.advertise<visualization_msgs::MarkerArray>("ped_markers",1,true); //true for latching
 
         timer_ped_diff_= nh_p_.createTimer(ros::Duration(diff_pub_period_),&PedManager::cbPublishPedDiff,this);
         timer_prune_= nh_p_.createTimer(ros::Duration(prune_period_),&PedManager::cbPrune,this);
         timer_dump_ = nh_p_.createTimer(ros::Duration(dump_period_),&PedManager::cbDump,this);
         timer_vis_= nh_p_.createTimer(ros::Duration(vis_period_),&PedManager::cbVis,this);
+        timer_recent_= nh_p_.createTimer(ros::Duration(vis_period_),&PedManager::cbRecent,this);
 
     }
     ~PedManager(){}
@@ -177,7 +197,7 @@ public:
         // Return a vector of PedTraj messages
         ford_msgs::PedTrajVec pedTrajVecMsg;
         std::map<size_t, PedTrajData*>::iterator it;
-        ros::Time current_time = ros::Time::now();
+        // ros::Time current_time = ros::Time::now();
 
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
             if (ped_only){
@@ -210,6 +230,11 @@ public:
             it->second->updateDiffIndex();
         }
         // ROS_INFO_STREAM(ped_traj_vec_msg);
+    }
+
+    void cbRecent(const ros::TimerEvent& timerEvent)
+    {
+        // TODO publish recent trajectory
     }
 
     void cbPrune(const ros::TimerEvent& timerEvent)
