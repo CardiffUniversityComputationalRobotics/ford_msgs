@@ -209,17 +209,19 @@ public:
         for (it = ped_map_.begin(); it != ped_map_.end(); ++it){
             it->second->updateDiffIndex();
         }
-        ROS_INFO_STREAM(ped_traj_vec_msg);
+        // ROS_INFO_STREAM(ped_traj_vec_msg);
     }
 
     void cbPrune(const ros::TimerEvent& timerEvent)
     {
-        // pruneInactive(ros::Duration(inactive_tol_),true);
+        pruneInactive(ros::Duration(inactive_tol_),true);
     }
 
     void pruneInactive(const ros::Duration& inactive_tol, bool keep_ped)
     {
         // ROS_INFO_STREAM("[PedManager::pruneInactive] Pruning started.");
+        std::vector<size_t> pruned_id_vec;
+
         std::map<size_t, PedTrajData*>::iterator it;
         for (it = ped_map_.begin(); it != ped_map_.end();){
             if (keep_ped){
@@ -230,19 +232,21 @@ public:
             }
             if (current_cluster_time_ - it->second->lastUpdateTime_ > inactive_tol){
                 delete it->second;
+                pruned_id_vec.push_back(it->first);
+                ROS_INFO_STREAM("[PedManager::pruneInactive] Pruned id: " << it->first);
                 ped_map_.erase(it++);
             }
             else{
                 ++it;
             }
         }
-        // ROS_INFO_STREAM("[PedManager::pruneInactive] Pruning done.");
+
     }
 
     void cbDump(const ros::TimerEvent& timerEvent)
     {
-        // ford_msgs::PedTrajVec pedTrajVec = popInactivePed(ros::Duration(inactive_tol_));
-        // pub_ped_dump_.publish(pedTrajVec);
+        ford_msgs::PedTrajVec pedTrajVec = popInactivePed(ros::Duration(inactive_tol_));
+        pub_ped_dump_.publish(pedTrajVec);
     }
 
     ford_msgs::PedTrajVec popInactivePed(const ros::Duration& inactive_tol)
@@ -254,6 +258,7 @@ public:
             if (it->second->isPed_){ //Only process if is pedestrian
                 if (current_cluster_time_ - it->second->lastUpdateTime_ > inactive_tol){
                     pedTrajVec.ped_traj_vec.push_back(it->second->toPedTraj(false));
+                    ROS_INFO_STREAM("[PedManager::popInactivePed] Popped ped_id: " << it->first);
                     delete it->second;
                     ped_map_.erase(it++);
                 }
@@ -265,13 +270,12 @@ public:
                 ++it;
             }
         }
-        // ROS_INFO_STREAM("[PedManager::popInactivePed] Popping done.");
         return pedTrajVec;
     }
 
     void cbVis(const ros::TimerEvent& timerEvent)
     {
-        // publishMarkers();
+        publishMarkers();
     }
 
     void publishMarkers()
@@ -371,8 +375,6 @@ public:
         std::strftime(buffer,80,"%Y-%m-%d-%H-%M-%S",timeinfo);
         return std::string(buffer);
     }
-
-
 
 };
 

@@ -28,8 +28,7 @@ class PedLogger(object):
             ped_id = ped_traj.ped_id
             with open(self.file_name, 'a') as f:
                 for poseStamped in ped_traj.traj:
-                    # TODO is stamp the right time format?
-                    f.write(str([poseStamped.header.stamp.to_sec(), ped_id, poseStamped.pose.x, poseStamped.pose.y, 0.0]))
+                    f.write(str([poseStamped.header.stamp.to_sec(), ped_id, poseStamped.pose.x, poseStamped.pose.y, 0.0]).strip('[]')+'\n')
 
 if __name__ == '__main__':
     rospy.init_node('ped_logger',anonymous=False)
