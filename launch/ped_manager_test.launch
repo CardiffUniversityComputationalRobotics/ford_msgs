@@ -14,12 +14,12 @@
 		<param name="~recent_period" value="0.2"/>
 		<param name="~recent_tol" value="10.0"/>
 	</node>
-	<!-- <node name="ped_logger" pkg="ford_msgs" type="ped_logger.py" output="screen"> -->
-		<!-- <remap from="~ped_diff" to="ped_manager/ped_diff"/> -->
-	<!-- </node> -->
-	<node name="ped_pred" pkg="acl_gp" type="predictor_node" output="screen">
-		<remap from="~input" to="/ped_manager/ped_recent"/>
+	<node name="ped_logger" pkg="ford_msgs" type="ped_logger.py" output="screen">
+		<remap from="~ped_diff" to="ped_manager/ped_diff"/>
 	</node>
+	<!-- <node name="ped_pred" pkg="acl_gp" type="predictor_node" output="screen"> -->
+		<!-- <remap from="~input" to="/ped_manager/ped_recent"/> -->
+	<!-- </node> -->
 
 	<param name="use_sim_time" value="true"/>
 	<node pkg="rosbag" type="play" name="bag_player" args="--clock $(find ford_msgs)/bag/$(arg bag) --rate=1.0"/>
