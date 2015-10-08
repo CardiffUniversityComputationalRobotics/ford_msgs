@@ -19,6 +19,7 @@
 #include "ford_msgs/PedTraj.h"
 #include "ford_msgs/PedTrajVec.h"
 #include "ford_msgs/Pose2DStamped.h"
+#include "ford_msgs/Clusters.h"
 
 // #include "pedestrian.hpp"
 
@@ -199,7 +200,7 @@ public:
         ros::param::getCached("~ped_count_tol",ped_count_tol_);
     }
 
-    void cbClusters(const pcl_clustering::Clusters& clusters){
+    void cbClusters(const ford_msgs::Clusters& clusters){
         // Manage the clusers
         current_cluster_time_ = clusters.header.stamp; //Use the cluster time to avoid time synce problem between machines
         PedMap::iterator it;
