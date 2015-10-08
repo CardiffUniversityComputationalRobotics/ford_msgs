@@ -135,10 +135,9 @@ include_directories(
 ## either from message generation or dynamic reconfigure
 
 ## Declare a C++ executable
-add_executable(ped_manager_node src/ped_manager.cpp)
-# add_dependencies(ped_manager_node ford_msgs_generate_messages_cpp ${catkin_EXPORTED_TARGETS})
-add_dependencies(ped_manager_node ${catkin_EXPORTED_TARGETS})
-target_link_libraries(ped_manager_node ${catkin_LIBRARIES})
+# add_executable(ped_manager_node src/ped_manager.cpp)
+# add_dependencies(ped_manager_node ${catkin_EXPORTED_TARGETS})
+# target_link_libraries(ped_manager_node ${catkin_LIBRARIES})
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
