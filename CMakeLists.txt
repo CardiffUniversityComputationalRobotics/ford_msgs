@@ -53,6 +53,8 @@ add_message_files(
   Pose2DStamped.msg
   PedTraj.msg
   PedTrajVec.msg
+  Pred_PedTrajs.msg
+  RawTraj.msg
   Clusters.msg
 )
 
