@@ -20,8 +20,11 @@ bool backInterpolate(const PoseVec& posVec, const ros::Time& stamp, PoseVec::con
             //Do interpolation
             ros::Duration full_duration = rIt->header.stamp - (rIt+1)->header.stamp;
             ros::Duration part_duration = rIt->header.stamp - stamp;
-            pose2DStamped.pose.x = rIt->pose.x - ((rIt+1)->pose.x - rIt->pose.x)*(part_duration.toSec()/full_duration.toSec()); 
-            pose2DStamped.pose.y = rIt->pose.y - ((rIt+1)->pose.y - rIt->pose.y)*(part_duration.toSec()/full_duration.toSec()); 
+            double ratio = part_duration.toSec()/full_duration.toSec();
+            pose2DStamped.pose.x = rIt->pose.x - ((rIt+1)->pose.x - rIt->pose.x)*ratio; 
+            pose2DStamped.pose.y = rIt->pose.y - ((rIt+1)->pose.y - rIt->pose.y)*ratio; 
+            pose2DStamped.velocity.x = rIt->velocity.x - ((rIt+1)->velocity.x - rIt->velocity.x)*ratio; 
+            pose2DStamped.velocity.y = rIt->velocity.y - ((rIt+1)->velocity.y - rIt->velocity.y)*ratio; 
             pose2DStamped.header.frame_id = rIt->header.frame_id;
             pose2DStamped.header.stamp = stamp;
             return true;
@@ -42,8 +45,11 @@ bool frontInterpolate(const PoseVec& posVec, const ros::Time& stamp, PoseVec::co
             //Do interpolation
             ros::Duration full_duration = (it+1)->header.stamp - it->header.stamp;
             ros::Duration part_duration = stamp - it->header.stamp;
-            pose2DStamped.pose.x = it->pose.x + ((it+1)->pose.x - it->pose.x)*(part_duration.toSec()/full_duration.toSec()); 
-            pose2DStamped.pose.y = it->pose.y + ((it+1)->pose.y - it->pose.y)*(part_duration.toSec()/full_duration.toSec()); 
+            double ratio = part_duration.toSec()/full_duration.toSec();
+            pose2DStamped.pose.x = it->pose.x + ((it+1)->pose.x - it->pose.x)*ratio; 
+            pose2DStamped.pose.y = it->pose.y + ((it+1)->pose.y - it->pose.y)*ratio; 
+            pose2DStamped.velocity.x = it->velocity.x + ((it+1)->velocity.x - it->velocity.x)*ratio; 
+            pose2DStamped.velocity.y = it->velocity.y + ((it+1)->velocity.y - it->velocity.y)*ratio; 
             pose2DStamped.header.frame_id = it->header.frame_id;
             pose2DStamped.header.stamp = stamp;
             return true;
