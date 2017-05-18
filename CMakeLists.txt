@@ -59,6 +59,8 @@ add_message_files(
   Clusters.msg
   PlannerMode.msg
   NNActions.msg
+  potential_detections.msg
+  ped_detection.msg
 )
 
 ## Generate services in the 'srv' folder
