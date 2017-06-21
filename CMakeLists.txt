@@ -52,6 +52,8 @@ add_message_files(
   FILES
   ClusterHit.msg
   Pose2DStamped.msg
+  ImageObj.msg
+  ImageRect.msg
   PedTraj.msg
   PedTrajVec.msg
   # Pred_PedTrajs.msg
