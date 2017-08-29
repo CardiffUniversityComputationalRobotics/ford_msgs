@@ -63,6 +63,7 @@ add_message_files(
   NNActions.msg
   potential_detections.msg
   ped_detection.msg
+  SSDObjs.msg
 )
 
 ## Generate services in the 'srv' folder
