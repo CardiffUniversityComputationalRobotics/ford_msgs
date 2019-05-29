@@ -50,20 +50,27 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  ClusterHit.msg
   Pose2DStamped.msg
+  ImageObj.msg
+  ImageRect.msg
   PedTraj.msg
   PedTrajVec.msg
   # Pred_PedTrajs.msg
   # RawTraj.msg
   Clusters.msg
+  PlannerMode.msg
+  NNActions.msg
+  potential_detections.msg
+  ped_detection.msg
+  SSDObjs.msg
 )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+    FILES
+    GetSafeActions.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
