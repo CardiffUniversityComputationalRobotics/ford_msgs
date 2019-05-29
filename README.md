@@ -6,7 +6,7 @@ That is,
 
 ```bash
 $ cd ~/catkin_ws/src
-$ git clone git@bitbucket.org:acl-swarm/ford_msgs.git -b dev
+$ git clone git@bitbucket.org:acl-swarm/ford_msgs.git
 $ cd ~/catkin_ws
 $ catkin_make
 ```
