@@ -1,6 +1,6 @@
 This repo contains all of the ROS messages required for packages developed in the Ford projects of ACL.
 
-Please clone the `dev` branch and build using `catkin_make`.
+Please clone, then build using `catkin_make`.
 
 That is,
 
