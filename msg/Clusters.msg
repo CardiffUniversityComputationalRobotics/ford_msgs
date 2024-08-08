@@ -1,4 +1,4 @@
-Header header
+std_msgs/Header header
 uint32[] labels
 uint32[] counts
 geometry_msgs/Point[] mean_points
